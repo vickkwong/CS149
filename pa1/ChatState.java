@@ -87,7 +87,6 @@ public class ChatState {
 
             // If count == 1, then id should be lastID on the first
             // iteration.
-            //boolean isLocked = lock.tryLock();
 
             long id = lastID - count + 1;
             for (String msg: history.subList(history.size() - count, history.size())) {

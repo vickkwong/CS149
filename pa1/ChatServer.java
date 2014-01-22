@@ -4,6 +4,8 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.Charset;
+import java.util.LinkedList;
+import java.util.Queue;
 import java.util.concurrent.Semaphore;
 import java.util.HashMap;
 import java.util.Map;
@@ -21,11 +23,11 @@ public class ChatServer {
     private static int NUM_THREADS = 8;
 
     private static final Pattern PAGE_REQUEST
-        = Pattern.compile("GET /([^ /]+)/chat\\.html HTTP.*");
+            = Pattern.compile("GET /([^ /]+)/chat\\.html HTTP.*");
     private static final Pattern PULL_REQUEST
-        = Pattern.compile("POST /([^ /]+)/pull\\?last=([0-9]+) HTTP.*");
+            = Pattern.compile("POST /([^ /]+)/pull\\?last=([0-9]+) HTTP.*");
     private static final Pattern PUSH_REQUEST
-        = Pattern.compile("POST /([^ /]+)/push\\?msg=([^ ]*) HTTP.*");
+            = Pattern.compile("POST /([^ /]+)/push\\?msg=([^ ]*) HTTP.*");
 
     private static final String CHAT_HTML;
     static {
@@ -38,9 +40,10 @@ public class ChatServer {
 
     private final int port;
     private final Map<String,ChatState> stateByName
-        = new HashMap<String,ChatState>();
+            = new HashMap<String,ChatState>();
 
-    private static Semaphore semaphore;
+    private static Queue<Socket> queue = new LinkedList<Socket>();
+    private static WorkerThread[] allThreads = new WorkerThread[NUM_THREADS];
 
     /**
      * Constructs a new {@link ChatServer} that will service requests
@@ -49,43 +52,54 @@ public class ChatServer {
      */
     public ChatServer(final int port) throws IOException {
         this.port = port;
-        semaphore = new Semaphore(NUM_THREADS);
-
     }
 
     public void runForever() throws Exception {
         final ServerSocket server;
         server = new ServerSocket(port);
-
         for (int i = 0; i < NUM_THREADS; ++i) {
-            Runnable r = new Runnable() {
-                @Override
-                public void run() {
+            allThreads[i] = new WorkerThread();
+            allThreads[i].start();
+        }
+        while (true) {
+            try {
+                final Socket connection = server.accept();
+                synchronized (queue) {
+                    queue.add(connection);
+                    queue.notifyAll();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
 
-                    while (true) {
+    private class WorkerThread extends Thread {
+
+        @Override
+        public void run() {
+            Socket connection;
+            while (true) {
+                synchronized (queue) {
+                    while (queue.size() == 0) {
                         try {
-                            semaphore.acquire();
-                            final Socket connection;
-                            connection = server.accept();
-                            handle(connection);
-                            semaphore.release();
+                            queue.wait();
                         } catch (InterruptedException e) {
                             e.printStackTrace();
-                        } catch (IOException e) {
-                            e.printStackTrace();
                         }
-
                     }
+                    connection = queue.remove();
                 }
-            };
-            new Thread(r).start();
+                handle(connection);
+            }
         }
+
     }
 
     private void handle(final Socket connection) {
         try {
             final BufferedReader xi
-                = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+                    = new BufferedReader(new InputStreamReader(connection.getInputStream()));
             final OutputStream xo = connection.getOutputStream();
 
             final String request = xi.readLine();
@@ -130,9 +144,9 @@ public class ChatServer {
                                      final String content) throws IOException {
         final byte[] data = content.getBytes(utf8);
         final String headers =
-            "HTTP/1.0 " + status + "\n" +
-            "Content-Type: " + contentType + "; charset=utf-8\n" +
-            "Content-Length: " + data.length + "\n\n";
+                "HTTP/1.0 " + status + "\n" +
+                        "Content-Type: " + contentType + "; charset=utf-8\n" +
+                        "Content-Length: " + data.length + "\n\n";
 
         final BufferedOutputStream xo = new BufferedOutputStream(output);
         xo.write(headers.getBytes(utf8));
@@ -160,7 +174,7 @@ public class ChatServer {
      * file.
      */
     private static String getResourceAsString(final String name)
-        throws IOException {
+            throws IOException {
         final Reader xi = new InputStreamReader(
                 ChatServer.class.getClassLoader().getResourceAsStream(name));
         try {
