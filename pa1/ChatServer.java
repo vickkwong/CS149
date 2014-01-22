@@ -52,6 +52,7 @@ public class ChatServer {
      */
     public ChatServer(final int port) throws IOException {
         this.port = port;
+
     }
 
     public void runForever() throws Exception {
@@ -75,7 +76,6 @@ public class ChatServer {
     }
 
     private class WorkerThread extends Thread {
-
         @Override
         public void run() {
             Socket connection;
@@ -93,7 +93,6 @@ public class ChatServer {
                 handle(connection);
             }
         }
-
     }
 
     private void handle(final Socket connection) {
@@ -118,6 +117,15 @@ public class ChatServer {
                 final String room = m.group(1);
                 final String msg = m.group(2);
                 getState(room).addMessage(msg);
+                if (!room.equals("all")) {
+                    getState("all").addMessage(msg);
+                } else {
+                    for (String roomName : stateByName.keySet()) {
+                        if (!roomName.equals("all")) {
+                            getState(roomName).addMessage(msg);
+                        }
+                    }
+                }
                 sendResponse(xo, OK, TEXT, "ack");
             } else {
                 sendResponse(xo, NOT_FOUND, TEXT, "Malformed request.");
