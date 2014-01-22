@@ -1,9 +1,6 @@
 // ChatState
 
 import java.util.LinkedList;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 public class ChatState {
     private static final int MAX_HISTORY = 32;
@@ -11,11 +8,6 @@ public class ChatState {
     private final String name;
     private final LinkedList<String> history = new LinkedList<String>();
     private long lastID = System.currentTimeMillis();
-    private Lock lock = new ReentrantLock();
-    private Condition notReading = lock.newCondition();
-    private Condition notWriting = lock.newCondition();
-    private boolean isReading = false;
-    private boolean isWriting = false;
 
     public ChatState(final String name) {
         this.name = name;
@@ -42,28 +34,13 @@ public class ChatState {
      * messages.
      */
     public void addMessage(final String msg) {
-        lock.lock();
-        try {
-            while (isReading) {
-                try {
-                    notReading.await();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
+        synchronized (history) {
+            history.addLast(msg);
+            ++lastID;
+            if (history.size() > MAX_HISTORY) {
+                history.removeFirst();
             }
-            isWriting = true;
-            synchronized (history) {
-                history.addLast(msg);
-                ++lastID;
-                if (history.size() > MAX_HISTORY) {
-                    history.removeFirst();
-                }
-                history.notifyAll();
-            }
-            isWriting = false;
-            notWriting.signalAll();
-        } finally {
-            lock.unlock();
+            history.notifyAll();
         }
     }
 
@@ -93,46 +70,30 @@ public class ChatState {
      * wait even after messages have been posted.
      */
     public String recentMessages(long mostRecentSeenID) {
-        int count = messagesToSend(mostRecentSeenID);
-        if (count == 0) {
-            // TODO: Do not use Thread.sleep() here!
-            try {
-                synchronized (history) {
-                    history.wait(15000);
-                }
-            } catch (final InterruptedException xx) {
-                throw new Error("unexpected", xx);
-            }
-            count = messagesToSend(mostRecentSeenID);
-        }
-
         final StringBuffer buf = new StringBuffer();
-
-        // If count == 1, then id should be lastID on the first
-        // iteration.
-        //boolean isLocked = lock.tryLock();
-
-        lock.lock();
-        try {
-            while (isWriting) {
+        synchronized (history) {
+            int count = messagesToSend(mostRecentSeenID);
+            if (count == 0) {
+                // TODO: Do not use Thread.sleep() here!
                 try {
-                    notWriting.await();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
+
+                    history.wait(15000);
+
+                } catch (final InterruptedException xx) {
+                    throw new Error("unexpected", xx);
                 }
+                count = messagesToSend(mostRecentSeenID);
             }
-            isReading = true;
-            count = messagesToSend(mostRecentSeenID);
+
+            // If count == 1, then id should be lastID on the first
+            // iteration.
+            //boolean isLocked = lock.tryLock();
+
             long id = lastID - count + 1;
             for (String msg: history.subList(history.size() - count, history.size())) {
                 buf.append(id).append(": ").append(msg).append('\n');
                 ++id;
             }
-            //if (isLocked) lock.unlock();
-            isReading = false;
-            notReading.signal();
-        } finally {
-            lock.unlock();
         }
         return buf.toString();
     }
