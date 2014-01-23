@@ -4,13 +4,12 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.Charset;
-import java.util.LinkedList;
-import java.util.Queue;
-import java.util.concurrent.Semaphore;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.Queue;
+import java.util.LinkedList;
 
 public class ChatServer {
     private static final Charset utf8 = Charset.forName("UTF-8");
@@ -19,8 +18,30 @@ public class ChatServer {
     private static final String NOT_FOUND = "404 NOT FOUND";
     private static final String HTML = "text/html";
     private static final String TEXT = "text/plain";
+    private Queue<Work> queue = new LinkedList<Work>();
 
-    private static int NUM_THREADS = 8;
+
+    class Work
+    {
+        public String msg;
+        public ChatState state;
+        public Socket connection;
+
+        public boolean isConnection;
+
+        public Work(Socket connection)
+        {
+            this.connection = connection;
+            this.isConnection = true;
+        }
+
+        public Work(String msg, ChatState state)
+        {
+            this.msg = msg;
+            this.state = state;
+            this.isConnection = false;
+        }
+    };
 
     private static final Pattern PAGE_REQUEST
             = Pattern.compile("GET /([^ /]+)/chat\\.html HTTP.*");
@@ -42,9 +63,6 @@ public class ChatServer {
     private final Map<String,ChatState> stateByName
             = new HashMap<String,ChatState>();
 
-    private static Queue<Socket> queue = new LinkedList<Socket>();
-    private static WorkerThread[] allThreads = new WorkerThread[NUM_THREADS];
-
     /**
      * Constructs a new {@link ChatServer} that will service requests
      * on the specified <code>port</code>. <code>state</code> will be
@@ -52,45 +70,48 @@ public class ChatServer {
      */
     public ChatServer(final int port) throws IOException {
         this.port = port;
-
+        for (int i = 0; i < 8; i++)
+        {
+            Runnable r = new MyThreads();
+            Thread thread = new Thread(r);
+            thread.start();
+        }
     }
 
-    public void runForever() throws Exception {
-        final ServerSocket server;
-        server = new ServerSocket(port);
-        for (int i = 0; i < NUM_THREADS; ++i) {
-            allThreads[i] = new WorkerThread();
-            allThreads[i].start();
-        }
-        while (true) {
-            try {
-                final Socket connection = server.accept();
-                synchronized (queue) {
-                    queue.add(connection);
-                    queue.notifyAll();
+    class MyThreads implements Runnable {
+        public void run()
+        {
+            Work work;
+            while (true)
+            {
+                synchronized (queue)
+                {
+                    try {
+                        queue.wait();
+                        work = queue.remove();
+                    } catch (final InterruptedException yy) {
+                        throw new Error("unexpected", yy);
+                    }
                 }
-            } catch (IOException e) {
-                e.printStackTrace();
+                if (work.isConnection)
+                {
+                    handle(work.connection);
+                } else {
+                    work.state.addMessage(work.msg);
+                }
             }
         }
     }
 
-    private class WorkerThread extends Thread {
-        @Override
-        public void run() {
-            Socket connection;
-            while (true) {
-                synchronized (queue) {
-                    while (queue.size() == 0) {
-                        try {
-                            queue.wait();
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                    connection = queue.remove();
-                }
-                handle(connection);
+    public void runForever() throws Exception {
+        final ServerSocket server = new ServerSocket(port);
+        while (true) {
+            final Socket connection = server.accept();
+            synchronized (queue)
+            {
+                Work work = new Work (connection);
+                queue.add(work);
+                queue.notify();
             }
         }
     }
@@ -103,7 +124,6 @@ public class ChatServer {
 
             final String request = xi.readLine();
             System.out.println(Thread.currentThread() + ": " + request);
-
             Matcher m;
             if (request == null) {
                 sendResponse(xo, NOT_FOUND, TEXT, "Empty request.");
@@ -117,19 +137,38 @@ public class ChatServer {
                 final String room = m.group(1);
                 final String msg = m.group(2);
                 getState(room).addMessage(msg);
-                if (!room.equals("all")) {
-                    getState("all").addMessage(msg);
-                } else {
-                    for (String roomName : stateByName.keySet()) {
-                        if (!roomName.equals("all")) {
-                            getState(roomName).addMessage(msg);
+                if (room.equals("all"))
+                {
+                    synchronized (stateByName)
+                    {
+                        for (String roomName : stateByName.keySet())
+                        {
+                            if (!roomName.equals("all")) {
+                                Work work = new Work (msg, stateByName.get(roomName));
+                                synchronized (queue)
+                                {
+                                    queue.add(work);
+                                    queue.notify();
+                                }
+                            }
                         }
                     }
+                } else {
+                    ChatState stateAll = null;
+                    synchronized (stateByName)
+                    {
+                        stateAll = stateByName.get("all");
+                    }
+
+                    //don't post to "all" if it hasn't been created
+                    if (stateAll != null)
+                        stateAll.addMessage(msg);
                 }
                 sendResponse(xo, OK, TEXT, "ack");
             } else {
                 sendResponse(xo, NOT_FOUND, TEXT, "Malformed request.");
             }
+
             connection.close();
         }
         catch (final Exception xx) {
@@ -164,13 +203,18 @@ public class ChatServer {
         System.out.println(Thread.currentThread() + ": replied with " + data.length + " bytes");
     }
 
-    private ChatState getState(final String room) {
-        ChatState state = stateByName.get(room);
-        if (state == null) {
-            state = new ChatState(room);
-            stateByName.put(room, state);
+    private  ChatState getState(final String room) {
+
+        synchronized (stateByName)
+        {
+            ChatState state = stateByName.get(room);
+            if (state == null) {
+                System.out.println("why");
+                state = new ChatState(room);
+                stateByName.put(room, state);
+            }
+            return state;
         }
-        return state;
     }
 
     /**

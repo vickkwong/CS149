@@ -1,0 +1,5 @@
+Students: ckaymaz (Cagla Kaymaz), vkwong (Victoria Kwong)
+
+Our implementation is fairly simple. In the ChatState, all we did was synchronize the blocks where we are reading the recent messages and writing a new message. We synchronized on history to prevent that data structure from altering in the middle of read and writes. Additionally, we altered the sleep() call to a wait() call to be able to return messages as quickly as they were added.
+
+In the ChatServer class, we first created 8 new threads. These threads would simply wait until there was a request present in which case they would be notified and the thread would grab the request off the queue. Since there is a possibility that more requests are made than there are threads and to not lose any of the requests, we created a queue to store all the connection requests. We are synchronizing on the queue, to make sure nothing changes when we are reading or writing to it. Additionally, we are synchronizing on stateByName to prevent errors in the case where we have multiple chat rooms. We believe this will work because we prevent anything can be mutable from changing when we are accessing it.  
