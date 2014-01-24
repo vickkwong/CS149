@@ -155,10 +155,7 @@ public class ChatServer {
                     }
                 } else {
                     ChatState stateAll = null;
-                    synchronized (stateByName)
-                    {
-                        stateAll = stateByName.get("all");
-                    }
+                    stateAll = stateByName.get("all");
 
                     //don't post to "all" if it hasn't been created
                     if (stateAll != null)
