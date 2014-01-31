@@ -1,0 +1,177 @@
+import org.deuce.Atomic;
+import java.util.concurrent.atomic.AtomicLong;
+
+public class STMTreap implements IntSet {
+    static class Node {
+        final int key;
+        final int priority;
+        Node left;
+        Node right;
+
+        Node(final int key, final int priority) {
+            this.key = key;
+            this.priority = priority;
+        }
+
+        public String toString() {
+            return "Node[key=" + key + ", prio=" + priority +
+                    ", left=" + (left == null ? "null" : String.valueOf(left.key)) +
+                    ", right=" + (right == null ? "null" : String.valueOf(right.key)) + "]";
+        }
+    }
+
+    private AtomicLong randState = new AtomicLong();
+    private Node root;
+
+
+    @Atomic
+    public boolean contains(final int key) {
+        Node node = root;
+//        while (node != null) {
+//            if (key == node.key) {
+//                return true;
+//            }
+//            node = key < node.key ? node.left : node.right;
+//        }
+//        return false;
+        return containsHelper(key, node);
+    }
+
+    public boolean containsHelper(final int key, Node node) {
+        if (node == null)
+            return false;
+        if (key == node.key)
+            return true;
+        if (key < node.key)
+            return containsHelper(key, node.left);
+        else
+            return containsHelper(key, node.right);
+    }
+
+    @Atomic
+    public void add(final int key) {
+        if (!contains(key)) {
+        Node tempRoot = addImpl(root, key);
+        if (root != tempRoot)
+            root = tempRoot;
+        }
+    }
+
+    private Node addImpl(final Node node2, final int key) {
+        Node node = node2;
+        if (node == null) {
+            return new Node(key, randPriority());
+        }
+        else if (key == node.key) {
+            // no insert needed
+            return node;
+        }
+        else if (key < node.key) {
+            //node.left = addImpl(node.left, key);
+            Node tempNodeLeft = addImpl(node.left, key);
+            if (node.left != tempNodeLeft) {
+                node.left = tempNodeLeft;
+
+            }
+            if (node.left.priority > node.priority) {
+                return rotateRight(node);
+            }
+            return node;
+        }
+        else {
+            //node.right = addImpl(node.right, key);
+            Node tempNodeRight = addImpl(node.right, key);
+            if (node.right != tempNodeRight) {
+                node.right = tempNodeRight;
+
+            }
+            if (node.right.priority > node.priority) {
+                return rotateLeft(node);
+            }
+            return node;
+        }
+    }
+
+    private int randPriority() {
+        // The constants in this 64-bit linear congruential random number
+        // generator are from http://nuclear.llnl.gov/CNP/rng/rngman/node4.html
+        randState.compareAndSet(randState.get(), randState.get() * 2862933555777941757L + 3037000493L);
+        return (int)(randState.get() >> 30);
+    }
+
+    private Node rotateRight(final Node node) {
+        //       node                  nL
+        //     /      \             /      \
+        //    nL       z     ==>   x       node
+        //  /   \                         /   \
+        // x   nLR                      nLR   z
+        final Node nL = node.left;
+        node.left = nL.right;
+        nL.right = node;
+        return nL;
+    }
+
+    private Node rotateLeft(final Node node) {
+        final Node nR = node.right;
+        node.right = nR.left;
+        nR.left = node;
+        return nR;
+    }
+
+    @Atomic
+    public void remove(final int key) {
+        if (contains(key)) {
+        Node tempRoot = removeImpl(root, key);
+        if (root != tempRoot)
+            root = tempRoot;
+        }
+    }
+
+    private Node removeImpl(final Node node2, final int key) {
+        Node node = node2;
+        if (node == null) {
+            // not present, nothing to do
+            return null;
+        }
+        else if (key == node.key) {
+            if (node.left == null) {
+                // splice out this node
+                return node.right;
+            }
+            else if (node.right == null) {
+                return node.left;
+            }
+            else {
+                // Two children, this is the hardest case.  We will pretend
+                // that node has -infinite priority, move it down, then retry
+                // the removal.
+                if (node.left.priority > node.right.priority) {
+                    // node.left needs to end up on top
+                    final Node top = rotateRight(node);
+                    Node tempTopRight = removeImpl(top.right, key);
+                    if (top.right != tempTopRight)
+                        top.right = tempTopRight;
+                    return top;
+                } else {
+                    final Node top = rotateLeft(node);
+                    Node tempTopLeft = removeImpl(top.left, key);
+                    if (top.left != tempTopLeft)
+                        top.left = tempTopLeft;
+                    return top;
+                }
+            }
+        }
+        else if (key < node.key) {
+            Node tempNodeLeft = removeImpl(node.left, key);
+            if (node.left != tempNodeLeft)
+                node.left = tempNodeLeft;
+            return node;
+        }
+        else {
+            Node tempNodeRight = removeImpl(node.right, key);
+            if (node.right != tempNodeRight)
+                node.right = tempNodeRight;
+            return node;
+        }
+    }
+}
