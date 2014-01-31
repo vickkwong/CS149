@@ -27,34 +27,20 @@ public class STMTreap implements IntSet {
     @Atomic
     public boolean contains(final int key) {
         Node node = root;
-//        while (node != null) {
-//            if (key == node.key) {
-//                return true;
-//            }
-//            node = key < node.key ? node.left : node.right;
-//        }
-//        return false;
-        return containsHelper(key, node);
-    }
-
-    public boolean containsHelper(final int key, Node node) {
-        if (node == null)
-            return false;
-        if (key == node.key)
-            return true;
-        if (key < node.key)
-            return containsHelper(key, node.left);
-        else
-            return containsHelper(key, node.right);
+        while (node != null) {
+            if (key == node.key) {
+                return true;
+            }
+            node = key < node.key ? node.left : node.right;
+        }
+        return false;
     }
 
     @Atomic
     public void add(final int key) {
-        if (!contains(key)) {
         Node tempRoot = addImpl(root, key);
         if (root != tempRoot)
             root = tempRoot;
-        }
     }
 
     private Node addImpl(final Node node2, final int key) {
@@ -121,9 +107,9 @@ public class STMTreap implements IntSet {
     @Atomic
     public void remove(final int key) {
         if (contains(key)) {
-        Node tempRoot = removeImpl(root, key);
-        if (root != tempRoot)
-            root = tempRoot;
+            Node tempRoot = removeImpl(root, key);
+            if (root != tempRoot)
+                root = tempRoot;
         }
     }
 
