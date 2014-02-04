@@ -53,11 +53,9 @@ public class STMTreap implements IntSet {
             return node;
         }
         else if (key < node.key) {
-            //node.left = addImpl(node.left, key);
             Node tempNodeLeft = addImpl(node.left, key);
             if (node.left != tempNodeLeft) {
                 node.left = tempNodeLeft;
-
             }
             if (node.left.priority > node.priority) {
                 return rotateRight(node);
@@ -65,11 +63,9 @@ public class STMTreap implements IntSet {
             return node;
         }
         else {
-            //node.right = addImpl(node.right, key);
             Node tempNodeRight = addImpl(node.right, key);
             if (node.right != tempNodeRight) {
                 node.right = tempNodeRight;
-
             }
             if (node.right.priority > node.priority) {
                 return rotateLeft(node);
@@ -106,11 +102,9 @@ public class STMTreap implements IntSet {
 
     @Atomic
     public void remove(final int key) {
-        if (contains(key)) {
-            Node tempRoot = removeImpl(root, key);
-            if (root != tempRoot)
-                root = tempRoot;
-        }
+        Node tempRoot = removeImpl(root, key);
+        if (root != tempRoot)
+            root = tempRoot;
     }
 
     private Node removeImpl(final Node node2, final int key) {
