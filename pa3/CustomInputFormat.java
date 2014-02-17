@@ -20,22 +20,16 @@ import org.apache.hadoop.mapred.TaskAttemptContext;
 
 public class CustomInputFormat extends FileInputFormat<Text,Text>{
 
-    public RecordReader<Text, Text> createRecordReader(
-            InputSplit split, TaskAttemptContext context) throws IOException,
-            InterruptedException {
-        return new CustomRecordReader((FileSplit) split, context.getConfiguration());
-    }
-
     @Override
     protected boolean isSplitable(FileSystem fs, Path file) {
         return false;
     }
     
     @Override
-	public RecordReader<Text, Text> getRecordReader(InputSplit arg0,
-			JobConf arg1, Reporter arg2) throws IOException {
+	public RecordReader<Text, Text> getRecordReader(InputSplit fileSplit,
+			JobConf job, Reporter arg2) throws IOException {
 		// TODO Auto-generated method stub
-		return null;
+		return new CustomRecordReader((FileSplit) fileSplit, job);
 	}
 
     public static class CustomRecordReader implements RecordReader<Text, Text> {
@@ -106,16 +100,18 @@ public class CustomInputFormat extends FileInputFormat<Text,Text>{
 				numTitles++;
 				int endCurrentTitle = currentPos + matcher.end();
 				if (matcher.find()) {
+					//System.out.println("STILL ANOTHER");
 					currentPos += matcher.start();
 					value.set(contents.substring(endCurrentTitle, currentPos));
 				} else {
+					//System.out.println("IM THE LAST ONE!");
 					currentPos = contents.length();
-					value.set(contents.substring(matcher.end()));
+					value.set(contents.substring(endCurrentTitle));
 				}
+				return true;
 			} else {
 				return false;
 			}
-			return true;
 		}
 
 
