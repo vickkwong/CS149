@@ -23,7 +23,6 @@ public class STMTreap implements IntSet {
     private AtomicLong randState = new AtomicLong();
     private Node root;
 
-
     @Atomic
     public boolean contains(final int key) {
         Node node = root;
