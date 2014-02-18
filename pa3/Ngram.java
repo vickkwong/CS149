@@ -1,4 +1,4 @@
-package cs149.ngram;
+//package cs149.ngram;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -31,8 +31,8 @@ import org.apache.hadoop.util.ToolRunner;
 
 public class Ngram extends Configured implements Tool {
 
-	public static int n;
-	public static String queryFile;
+	//public static int n;
+	//public static String queryFile;
 	
 	public static void main(String[] args) throws Exception {
 		// TODO Auto-generated method stub
@@ -45,15 +45,17 @@ public class Ngram extends Configured implements Tool {
 	public int run(String[] args) throws Exception {
 		// TODO Auto-generated method stub
 		System.out.println(Arrays.toString(args));
-		n = Integer.parseInt(args[0]);
-		queryFile = args[1];
+		//n = Integer.parseInt(args[0]);
+		//queryFile = args[1];
 		JobConf job = new JobConf(Ngram.class);
 		job.setJobName("Ngram");
 		job.setOutputKeyClass(Text.class);
 		job.setOutputValueClass(IntWritable.class);
+		job.set("queryFile", args[1]);
+		job.set("n", args[0]);
 
 		job.setMapperClass(Map.class);
-		job.setCombinerClass(Reduce.class);
+		//job.setCombinerClass(Reduce.class);
 		job.setReducerClass(Reduce.class);
 
 		job.setInputFormat(CustomInputFormat.class);
@@ -71,12 +73,14 @@ public class Ngram extends Configured implements Tool {
 
 		private final static IntWritable ONE = new IntWritable(1);
 		private Set<String> queryNgrams = new HashSet<String>();
+		private int n;
 		
 		@Override
-		public void configure(JobConf arg0) {
+		public void configure(JobConf job) {
 			// TODO Auto-generated method stub
+			n = Integer.parseInt(job.get("n"));
 			try {
-				Scanner scanner = new Scanner(new File(queryFile)).useDelimiter("\\Z");
+				Scanner scanner = new Scanner(new File(job.get("queryFile"))).useDelimiter("\\Z");
 				String queryContents = scanner.next();
 				Tokenizer tokenizer = new Tokenizer(queryContents);
 				Queue<String> ngram = new LinkedList<String>();
@@ -84,7 +88,9 @@ public class Ngram extends Configured implements Tool {
 					ngram.add(tokenizer.next());
 					if (ngram.size() == n) {
 						String ngramValue = ngram.toString().replace(",", "").substring(1, ngram.toString().length() - n);
+						//System.out.println("ngramVAlue Query: " + ngramValue);
 						queryNgrams.add(ngramValue);
+						ngram.remove();
 					}
 				}
 			} catch (FileNotFoundException e) {
@@ -109,8 +115,11 @@ public class Ngram extends Configured implements Tool {
 				ngram.add(tokenizer.next());
 				if (ngram.size() == n) {
 					String ngramValue = ngram.toString().replace(",", "").substring(1, ngram.toString().length() - n);
-					if (queryNgrams.contains(ngramValue))
+					if (queryNgrams.contains(ngramValue)) {
+						//System.out.println("CONTAINS");
 						output.collect(key, ONE);
+					}
+					ngram.remove();
 				}
 			}
 			
