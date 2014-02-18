@@ -1,5 +1,3 @@
-//package cs149.ngram;
-
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -13,6 +11,7 @@ import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.filecache.DistributedCache;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
@@ -51,7 +50,9 @@ public class Ngram extends Configured implements Tool {
 		job.setJobName("Ngram");
 		job.setOutputKeyClass(Text.class);
 		job.setOutputValueClass(IntWritable.class);
-		job.set("queryFile", args[1]);
+		//job.set("queryFile", "query1.txt");
+		Path queryPath = new Path(args[1]);
+		DistributedCache.addCacheFile(queryPath.toUri(), job);
 		job.set("n", args[0]);
 
 		job.setMapperClass(Map.class);
@@ -80,7 +81,8 @@ public class Ngram extends Configured implements Tool {
 			// TODO Auto-generated method stub
 			n = Integer.parseInt(job.get("n"));
 			try {
-				Scanner scanner = new Scanner(new File(job.get("queryFile"))).useDelimiter("\\Z");
+				String queryFile = DistributedCache.getLocalCacheFiles(job)[0].toString();
+				Scanner scanner = new Scanner(new File(queryFile)).useDelimiter("\\Z");
 				String queryContents = scanner.next();
 				Tokenizer tokenizer = new Tokenizer(queryContents);
 				Queue<String> ngram = new LinkedList<String>();
@@ -94,6 +96,9 @@ public class Ngram extends Configured implements Tool {
 					}
 				}
 			} catch (FileNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}

@@ -1,6 +1,3 @@
-//package cs149.ngram;
-// Tokenizer
-
 import java.util.Iterator;
 
 public class Tokenizer implements Iterator<String> {

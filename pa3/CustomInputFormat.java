@@ -1,5 +1,3 @@
-//package cs149.ngram;
-
 import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
