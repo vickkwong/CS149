@@ -91,7 +91,9 @@ public class CustomInputFormat extends FileInputFormat<Text,Text>{
 		@Override
 		public boolean next(Text key, Text value) throws IOException {
 			// TODO Auto-generated method stub
-			Pattern titlePattern = Pattern.compile("<title>(.*)</title>");
+			Pattern titlePattern = Pattern.compile(Pattern.quote("<title>")
+                                                   + "(.*?)"
+                                                   + Pattern.quote("</title>"));
 			Matcher matcher = titlePattern.matcher(contents.substring(currentPos));
 			if (matcher.find()) {
 				key.set(matcher.group(1));
