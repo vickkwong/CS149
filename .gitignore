@@ -46,3 +46,5 @@ pa3 - test/query1.txt
 pa3 - test/query2.txt
 
 pa3 - test/src/Tester.java
+
+*.jpg

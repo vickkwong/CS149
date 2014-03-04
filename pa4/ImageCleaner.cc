@@ -16,7 +16,7 @@ void cpu_fftx(float *real_image, float *imag_image, int size_x, int size_y, floa
     
     #pragma omp parallel shared(size_x, size_y, real_image, imag_image, fft_real, fft_imag) private(x, y, term, n, xIndex)
     {
-        #pragma omp for schedule(guided)
+        #pragma omp for
         for(x = 0; x < size_x; x++)
         {
             xIndex = x * size_x;
@@ -60,7 +60,7 @@ void cpu_ifftx(float *real_image, float *imag_image, int size_x, int size_y, flo
     
     #pragma omp parallel shared(size_x, size_y, real_image, imag_image, fft_real, fft_imag) private(x, y, term, n, xIndex)
     {
-        #pragma omp for schedule(guided)
+        #pragma omp for 
         for(x = 0; x < size_x; x++)
         {
             xIndex = x * size_x;
@@ -101,10 +101,11 @@ void cpu_ffty(float *real_image, float *imag_image, int size_x, int size_y, floa
     unsigned int n;
     unsigned int term;
     unsigned int yIndex;
+    unsigned int xIndex;
     
-    #pragma omp parallel shared(size_x, size_y, real_image, imag_image, fft_real, fft_imag) private(x, y, term, n, yIndex)
+    #pragma omp parallel shared(size_x, size_y, real_image, imag_image, fft_real, fft_imag) private(x, y, term, n, yIndex, xIndex)
     {
-        #pragma omp for schedule(guided)
+        #pragma omp for
         for(y = 0; y < size_y; y++)
         {
             float *realOutBuffer = new float[size_y];
@@ -125,8 +126,9 @@ void cpu_ffty(float *real_image, float *imag_image, int size_x, int size_y, floa
             // Write the buffer back to were the original values were
             for(x = 0; x < size_x; x++)
             {
-                real_image[x*size_x + y] = realOutBuffer[x];
-                imag_image[x*size_x + y] = imagOutBuffer[x];
+                xIndex = (x * size_x) + y;
+                real_image[xIndex] = realOutBuffer[x];
+                imag_image[xIndex] = imagOutBuffer[x];
             }
             delete [] realOutBuffer;
             delete [] imagOutBuffer;
@@ -142,10 +144,11 @@ void cpu_iffty(float *real_image, float *imag_image, int size_x, int size_y, flo
     unsigned int n;
     unsigned int term;
     unsigned int yIndex;
+    unsigned int xIndex;
     
-    #pragma omp parallel shared(size_x, size_y, real_image, imag_image, fft_real, fft_imag) private(x, y, term, n, yIndex)
+    #pragma omp parallel shared(size_x, size_y, real_image, imag_image, fft_real, fft_imag) private(x, y, term, n, yIndex, xIndex)
     {
-        #pragma omp for schedule(guided)
+        #pragma omp for
         for(y = 0; y < size_y; y++)
         {
             
@@ -173,8 +176,9 @@ void cpu_iffty(float *real_image, float *imag_image, int size_x, int size_y, flo
             // Write the buffer back to were the original values were
             for(x = 0; x < size_x; x++)
             {
-                real_image[x*size_x + y] = realOutBuffer[x];
-                imag_image[x*size_x + y] = imagOutBuffer[x];
+                xIndex = (x * size_x) + y;
+                real_image[xIndex] = realOutBuffer[x];
+                imag_image[xIndex] = imagOutBuffer[x];
             }
             delete [] realOutBuffer;
             delete [] imagOutBuffer;
@@ -191,10 +195,11 @@ void cpu_filter(float *real_image, float *imag_image, int size_x, int size_y)
     
     unsigned int x;
     unsigned int y;
+    unsigned int yIndex;
     
-    #pragma omp parallel shared(eightX, eight7X, eightY, eight7Y) private(x, y)
+    #pragma omp parallel shared(eightX, eight7X, eightY, eight7Y) private(x, y, yIndex)
     {
-        #pragma omp for schedule(guided)
+        #pragma omp for
         for(x = 0; x < size_x; x++)
         {
             for(y = 0; y < size_y; y++)
@@ -205,8 +210,9 @@ void cpu_filter(float *real_image, float *imag_image, int size_x, int size_y)
                    !(x >= eight7X && y >= eight7Y))
                 {
                     // Zero out these values
-                    real_image[y*size_x + x] = 0;
-                    imag_image[y*size_x + x] = 0;
+                    yIndex = (y * size_x) + x;
+                    real_image[yIndex] = 0;
+                    imag_image[yIndex] = 0;
                 }
             }
         }
@@ -224,9 +230,12 @@ float imageCleaner(float *real_image, float *imag_image, int size_x, int size_y)
     
     float *fft_real = new float[size_x];
     float *fft_imag = new float[size_x];
+    float term;
+    unsigned int n;
     
-    for (int n = 0; n < size_x; ++n) {
-        float term = -2 * PI * n / size_x;
+    #pragma omp parallel for shared(fft_real, fft_imag) private (term, n)
+    for (n = 0; n < size_x; ++n) {
+        term = -2 * PI * n / size_x;
         fft_real[n] = cos(term);
         fft_imag[n] = sin(term);
     }
