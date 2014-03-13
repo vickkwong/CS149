@@ -19,22 +19,29 @@
 
 __global__ void fftx(float *real_image, float *imag_image, int size_x, int size_y, float *fft_real, float *fft_imag)
 {
+
+    unsigned int xIndex = blockIdx.x * size_x;
+
     __shared__ float fftReal[SIZEX];
     __shared__ float fftImag[SIZEX];
+    __shared__ float realImage[SIZEX];
+    __shared__ float imagImage[SIZEX];
     
     fftReal[threadIdx.x] = fft_real[threadIdx.x];
     fftImag[threadIdx.x] = fft_imag[threadIdx.x];
     
+    realImage[threadIdx.x] = real_image[xIndex + threadIdx.x];
+    imagImage[threadIdx.x] = imag_image[xIndex + threadIdx.x];
+    
     __syncthreads();
 
-    unsigned int xIndex = blockIdx.x * size_x;
     float realOut = 0.0f;
     float imagOut = 0.0f;
     
     for (unsigned int n = 0; n < size_y; ++n) {
         unsigned int term = (threadIdx.x * n) % size_y;
-        realOut += (real_image[xIndex + n] * fftReal[term]) - (imag_image[xIndex + n] * fftImag[term]);
-        imagOut += (imag_image[xIndex + n] * fftReal[term]) + (real_image[xIndex + n] * fftImag[term]);
+        realOut += (realImage[n] * fftReal[term]) - (imagImage[n] * fftImag[term]);
+        imagOut += (imagImage[n] * fftReal[term]) + (realImage[n] * fftImag[term]);
     }
     
     __syncthreads();
@@ -45,21 +52,27 @@ __global__ void fftx(float *real_image, float *imag_image, int size_x, int size_
 
 __global__ void ifftx(float *real_image, float *imag_image, int size_x, int size_y, float *fft_real, float *fft_imag)
 {
+    unsigned int xIndex = blockIdx.x * size_x;
+
     __shared__ float fftReal[SIZEX];
     __shared__ float fftImag[SIZEX];
+    __shared__ float realImage[SIZEX];
+    __shared__ float imagImage[SIZEX];
     
     fftReal[threadIdx.x] = fft_real[threadIdx.x];
     fftImag[threadIdx.x] = fft_imag[threadIdx.x];
     
+    realImage[threadIdx.x] = real_image[xIndex + threadIdx.x];
+    imagImage[threadIdx.x] = imag_image[xIndex + threadIdx.x];
+    
     __syncthreads();
 
-    unsigned int xIndex = blockIdx.x * size_x;
     float realOut = 0.0f;
     float imagOut = 0.0f;
     for (unsigned int n = 0; n < size_y; ++n) {
         unsigned int term = (threadIdx.x * n) % size_y;
-        realOut += (real_image[xIndex + n] * fftReal[term]) - (imag_image[xIndex + n] * -fftImag[term]);
-        imagOut += (imag_image[xIndex + n] * fftReal[term]) + (real_image[xIndex + n] * -fftImag[term]);
+        realOut += (realImage[n] * fftReal[term]) - (imagImage[n] * -fftImag[term]);
+        imagOut += (imagImage[n] * fftReal[term]) + (realImage[n] * -fftImag[term]);
     }
     
     __syncthreads();
@@ -76,19 +89,23 @@ __global__ void ffty(float *real_image, float *imag_image, int size_x, int size_
 {
     __shared__ float fftReal[SIZEX];
     __shared__ float fftImag[SIZEX];
+    __shared__ float realImage[SIZEX];
+    __shared__ float imagImage[SIZEX];
     
     fftReal[threadIdx.x] = fft_real[threadIdx.x];
     fftImag[threadIdx.x] = fft_imag[threadIdx.x];
     
+    realImage[threadIdx.x] = real_image[threadIdx.x * size_x + blockIdx.x];
+    imagImage[threadIdx.x] = imag_image[threadIdx.x * size_x + blockIdx.x];
+
     __syncthreads();
 
     float realOut = 0.0f;
     float imagOut = 0.0f;
     for (unsigned int n = 0; n < size_y; ++n) {
         unsigned int term = (threadIdx.x * n) % size_x;
-        unsigned int yIndex = (n * size_x) + blockIdx.x;
-        realOut += (real_image[yIndex] * fftReal[term]) - (imag_image[yIndex] * fftImag[term]);
-        imagOut += (imag_image[yIndex] * fftReal[term]) + (real_image[yIndex] * fftImag[term]);
+        realOut += (realImage[n] * fftReal[term]) - (imagImage[n] * fftImag[term]);
+        imagOut += (imagImage[n] * fftReal[term]) + (realImage[n] * fftImag[term]);
     }
     
     __syncthreads();
@@ -103,9 +120,14 @@ __global__ void iffty(float *real_image, float *imag_image, int size_x, int size
 {
     __shared__ float fftReal[SIZEX];
     __shared__ float fftImag[SIZEX];
+    __shared__ float realImage[SIZEX];
+    __shared__ float imagImage[SIZEX];
     
     fftReal[threadIdx.x] = fft_real[threadIdx.x];
     fftImag[threadIdx.x] = fft_imag[threadIdx.x];
+    
+    realImage[threadIdx.x] = real_image[threadIdx.x * size_x + blockIdx.x];
+    imagImage[threadIdx.x] = imag_image[threadIdx.x * size_x + blockIdx.x];
     
     __syncthreads();
 
@@ -114,9 +136,8 @@ __global__ void iffty(float *real_image, float *imag_image, int size_x, int size
 
     for (unsigned int n = 0; n < size_y; ++n) {
         unsigned int term = (threadIdx.x * n) % size_x;
-        unsigned int yIndex = (n * size_x) + blockIdx.x;
-        realOut += (real_image[yIndex] * fftReal[term]) - (imag_image[yIndex] * -fftImag[term]);
-        imagOut += (imag_image[yIndex] * fftReal[term]) + (real_image[yIndex] * -fftImag[term]);
+        realOut += (realImage[n] * fftReal[term]) - (imagImage[n] * -fftImag[term]);
+        imagOut += (imagImage[n] * fftReal[term]) + (realImage[n] * -fftImag[term]);
     }
     
     __syncthreads();
